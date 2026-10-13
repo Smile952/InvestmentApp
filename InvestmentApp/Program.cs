@@ -13,7 +13,7 @@ var meta = new Metadata
 };
 
 
-TinkofRequestManager manager = new TinkofRequestManager(50, 3000);
+TinkofRequestManager manager = new TinkofRequestManager(25, 5000);
 
 var instrumentsClient = new InstrumentsService.InstrumentsServiceClient(channel);
 var marketClient = new MarketDataService.MarketDataServiceClient(channel);
@@ -30,21 +30,24 @@ await manager.AppendRequestAsync(async () => analyzerModels = await bondAnalyzer
 await manager.AppendRequestAsync(async () => lastPrices = await markerdataProvider.GetLastPricesAsync());
 bondAnalyzerService.InjectLastPrice(ref analyzerModels, lastPrices);
 
-List<GetBondCouponsResponse> coupons = new List<GetBondCouponsResponse>();
+Dictionary<string, GetBondCouponsResponse> coupons = new Dictionary<string, GetBondCouponsResponse>();
 foreach(var am in analyzerModels)
 {
     await manager.AppendRequestAsync(async () =>
     {
         var coupon = await bondProvider.GetBondCoupons(am.Uid, DateTime.UtcNow, DateTime.MaxValue);
-        coupons.Add(coupon);
+        coupons[am.Uid] = coupon;
     });
 }
-var final = (await bondAnalyzerService.GetFinalSum(analyzerModels)).DistinctBy(x => x.Name);
+var final = bondAnalyzerService.GetFinalSum(analyzerModels, coupons).DistinctBy(x => x.Name);
 var result = 
     final.ToDictionary(
         x => x.Name, 
         x => new { 
             value = x.CouponSum + x.Nominal - x.Price, 
-            forTime = (x.EndDate - x.StartDate).TotalDays 
+            forTime = new DateTime(x.EndDate.Ticks).ToString("D")
         }).Where(x => x.Value.value > 0).OrderByDescending(x => x.Value.value);
-Console.WriteLine();
+foreach(var r in result)
+{
+    Console.WriteLine($"{r.Key}: {r.Value.value} to {r.Value.forTime}");
+}

@@ -53,18 +53,8 @@ namespace InvestmentApp.Services
                 .ToList();
         }
 
-        public async Task<List<BondModel>> GetFinalSum(List<BondAnalyzerModel> analyzerModels)
+        public List<BondModel> GetFinalSum(List<BondAnalyzerModel> analyzerModels, Dictionary<string, GetBondCouponsResponse> coupons)
         {
-            Dictionary<string, GetBondCouponsResponse> coupons = new Dictionary<string, GetBondCouponsResponse>();
-            for (int i = 0; i < analyzerModels.Count() / 10; i++)
-            {
-                var tasks = analyzerModels.Take(new Range(i*10, (i+1)*10)).Select(async am =>
-                {
-                    coupons[am.Uid] = await provider.GetBondCoupons(am.Uid, DateTime.UtcNow, DateTime.MaxValue);
-                });
-                await Task.WhenAll(tasks.ToList().Take(new Range(i, (i+1)*10)));
-                await Task.Delay(2000);
-            }
             Dictionary<string, Decimal> couponSumPerBond = 
                 analyzerModels.ToDictionary(
                     x => x.Uid, 
